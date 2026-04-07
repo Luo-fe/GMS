@@ -749,5 +749,129 @@ class TestPerformanceBaselines:
         assert elapsed < 120  # 不应超过 2 分钟
 
 
+class TestFIDISIntegration:
+    """FID/IS 指标集成到训练流程的测试"""
+
+    def test_epoch_metrics_with_fid_is(self):
+        """测试 EpochMetrics 包含 FID/IS 字段"""
+        from gms.diffusion_integration.trainer import EpochMetrics
+
+        metrics = EpochMetrics(
+            epoch=1,
+            phase="val",
+            total_loss=0.5,
+            fid_score=123.45,
+            is_mean=7.8,
+            is_std=0.3,
+        )
+
+        assert metrics.fid_score == 123.45
+        assert metrics.is_mean == 7.8
+        assert metrics.is_std == 0.3
+
+        data = metrics.to_dict()
+        assert 'fid_score' in data
+        assert 'is_mean' in data
+        assert 'is_std' in data
+
+    def test_training_config_with_eval_settings(self):
+        """测试 TrainingConfig 包含评估配置"""
+        from gms.diffusion_integration.trainer import TrainingConfig
+
+        config = TrainingConfig(
+            eval_frequency=3,
+            num_gen_samples_for_eval=500,
+            compute_fid=True,
+            compute_is=True,
+            is_splits=5,
+        )
+
+        assert config.eval_frequency == 3
+        assert config.num_gen_samples_for_eval == 500
+        assert config.compute_fid is True
+        assert config.compute_is is True
+        assert config.is_splits == 5
+
+    def test_evaluate_with_metrics_method(self, device):
+        """测试 evaluate_with_metrics 方法存在且可调用"""
+        from gms.diffusion_integration.forward_process import NoiseScheduler, GMSForwardProcess
+        from gms.diffusion_integration.backward_process import GMSBackwardProcess
+        from gms.diffusion_integration.trainer import TrainingConfig, GMSTrainer
+
+        scheduler = NoiseScheduler(num_steps=50, schedule_type='cosine', device=device)
+        forward = GMSForwardProcess(scheduler)
+        backward = GMSBackwardProcess(scheduler)
+
+        model = SimpleDenoisingNet().to(device)
+
+        config = TrainingConfig(
+            batch_size=4,
+            learning_rate=1e-3,
+            epochs=1,
+            device=device,
+            eval_frequency=1,
+            num_gen_samples_for_eval=4,
+            compute_fid=False,
+            compute_is=False,
+            seed=42,
+        )
+
+        trainer = GMSTrainer(
+            model=model,
+            noise_scheduler=scheduler,
+            forward_process=forward,
+            backward_process=backward,
+            config=config,
+        )
+
+        assert hasattr(trainer, 'evaluate_with_metrics')
+        assert callable(trainer.evaluate_with_metrics)
+
+    def test_train_full_with_real_images_param(self, device):
+        """测试 train_full 接受 real_images_for_eval 参数"""
+        from gms.diffusion_integration.forward_process import NoiseScheduler, GMSForwardProcess
+        from gms.diffusion_integration.backward_process import GMSBackwardProcess
+        from gms.diffusion_integration.trainer import TrainingConfig, GMSTrainer
+
+        scheduler = NoiseScheduler(num_steps=50, schedule_type='cosine', device=device)
+        forward = GMSForwardProcess(scheduler)
+        backward = GMSBackwardProcess(scheduler)
+
+        model = SimpleDenoisingNet().to(device)
+
+        config = TrainingConfig(
+            batch_size=4,
+            learning_rate=1e-3,
+            epochs=2,
+            device=device,
+            eval_frequency=1,
+            num_gen_samples_for_eval=4,
+            compute_fid=False,
+            compute_is=False,
+            seed=42,
+        )
+
+        trainer = GMSTrainer(
+            model=model,
+            noise_scheduler=scheduler,
+            forward_process=forward,
+            backward_process=backward,
+            config=config,
+        )
+
+        train_loader = create_test_data(batch_size=4, num_samples=16)
+        val_loader = create_test_data(batch_size=4, num_samples=8)
+
+        real_images = torch.randn(10, 3, 32, 32).to(device)
+
+        history = trainer.train_full(
+            epochs=2,
+            dataloaders={'train': train_loader, 'val': val_loader},
+            real_images_for_eval=real_images,
+        )
+
+        assert len(history.train_metrics) == 2
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

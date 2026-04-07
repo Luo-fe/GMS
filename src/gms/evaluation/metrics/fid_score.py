@@ -191,8 +191,12 @@ class FIDCalculator:
         if self.use_cache and cache_key is not None:
             if cache_key in self.feature_cache:
                 logger.debug(f"使用缓存的特征: {cache_key}")
-                cached_mean, _ = self.feature_cache[cache_key]
-                return cached_mean
+
+                preprocessed = self._preprocess_images(images)
+                features = self._extract_features_batch(preprocessed)
+
+                logger.info(f"特征提取完成 (使用缓存统计量): shape={features.shape}")
+                return features
 
         logger.info(f"提取特征: {len(images)} 张图像")
 

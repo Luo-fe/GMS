@@ -83,7 +83,7 @@ class TrainingPhase(Enum):
     """训练阶段枚举
 
     PRETRAIN_GMM: 预训练 GMM 参数（不更新扩散模型）
-    JOINT_FINE TUNE: 联合微调（同时更新所有参数）
+    JOINT_FINE_TUNE: 联合微调（同时更新所有参数）
     DIFFUSION_ONLY: 仅训练扩散模型（冻结 GMM）
     """
     PRETRAIN_GMM = "pretrain_gmm"
@@ -180,6 +180,14 @@ class TrainingConfig:
     seed: int = 42
     deterministic: bool = False
 
+    eval_frequency: int = 5
+    num_gen_samples_for_eval: int = 1000
+    eval_batch_size: int = 50
+    compute_fid: bool = True
+    compute_is: bool = True
+    is_splits: int = 10
+    real_images_for_eval: Optional[str] = None
+
     def __post_init__(self):
         """初始化后验证"""
         if self.batch_size <= 0:
@@ -250,6 +258,9 @@ class EpochMetrics:
         samples_processed: 处理的样本数
         gpu_memory: GPU 内存使用量（MB，可选）
         extra_metrics: 其他自定义指标
+        fid_score: FID 分数（可选，验证时计算）
+        is_mean: Inception Score 均值（可选，验证时计算）
+        is_std: Inception Score 标准差（可选，验证时计算）
     """
 
     epoch: int
@@ -264,6 +275,9 @@ class EpochMetrics:
     samples_processed: int = 0
     gpu_memory: Optional[float] = None
     extra_metrics: Dict[str, float] = field(default_factory=dict)
+    fid_score: Optional[float] = None
+    is_mean: Optional[float] = None
+    is_std: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -279,6 +293,9 @@ class EpochMetrics:
             'time_elapsed': self.time_elapsed,
             'samples_processed': self.samples_processed,
             'gpu_memory': self.gpu_memory,
+            'fid_score': self.fid_score,
+            'is_mean': self.is_mean,
+            'is_std': self.is_std,
             **self.extra_metrics,
         }
 
@@ -1211,6 +1228,121 @@ class GMSTrainer:
 
         return metrics
 
+    @torch.no_grad()
+    def evaluate_with_metrics(
+        self,
+        real_images: torch.Tensor,
+        epoch: int,
+        num_samples: Optional[int] = None,
+    ) -> Dict[str, float]:
+        """使用 FID 和 IS 指标评估生成模型
+
+        生成样本并计算 FID 和 Inception Score，用于量化评估模型性能。
+
+        Args:
+            real_images: 真实图像张量 (N, C, H, W)，值域 [0, 1]
+            epoch: 当前 epoch 编号
+            num_samples: 要生成的样本数（默认使用配置中的值）
+
+        Returns:
+            包含 FID 和 IS 指标的字典:
+                - 'fid': FID 分数（越低越好）
+                - 'is_mean': IS 均值（越高越好）
+                - 'is_std': IS 标准差
+
+        Example:
+            >>> metrics = trainer.evaluate_with_metrics(real_images, epoch=10)
+            >>> print(f"FID: {metrics['fid']:.2f}, IS: {metrics['is_mean']:.2f}")
+        """
+        num_samples = num_samples or self.config.num_gen_samples_for_eval
+
+        eval_start_time = time.time()
+
+        try:
+            from .inference import GMSInferencePipeline, InferenceConfig
+
+            inference_config = InferenceConfig(
+                sampling_steps=50,
+                method='ddim',
+                batch_size=self.config.eval_batch_size,
+                device=str(self.device),
+                dtype=self.dtype,
+                verbose=False,
+            )
+
+            pipeline = GMSInferencePipeline(
+                model=self.model,
+                noise_scheduler=self.noise_scheduler,
+                backward_process=self.backward_process,
+                config=inference_config,
+                condition_encoder=self.condition_encoder,
+                gmm_parameters=self.gmm_parameters,
+            )
+
+            result = pipeline.generate(n_samples=num_samples)
+            gen_samples = result.samples
+
+            gen_samples = torch.clamp(gen_samples, 0.0, 1.0)
+
+        except Exception as e:
+            if logger:
+                logger.error(f"生成样本失败: {e}")
+            return {'fid': None, 'is_mean': None, 'is_std': None}
+
+        metrics = {}
+
+        if self.config.compute_fid:
+            try:
+                from gms.evaluation.metrics.fid_score import FIDCalculator
+
+                fid_calc = FIDCalculator(
+                    device=str(self.device),
+                    batch_size=self.config.eval_batch_size,
+                )
+
+                fid_value = fid_calc.calculate_fid(real_images, gen_samples)
+                metrics['fid'] = float(fid_value)
+
+                if logger:
+                    logger.info(f"Epoch [{epoch}] FID: {fid_value:.4f}")
+
+            except Exception as e:
+                if logger:
+                    logger.warning(f"FID 计算失败: {e}")
+                metrics['fid'] = None
+
+        if self.config.compute_is:
+            try:
+                from gms.evaluation.metrics.is_score import ISCalculator
+
+                is_calc = ISCalculator(
+                    device=str(self.device),
+                    batch_size=self.config.eval_batch_size,
+                )
+
+                is_mean_val, is_std_val = is_calc.calculate_is(
+                    gen_samples, splits=self.config.is_splits
+                )
+                metrics['is_mean'] = float(is_mean_val)
+                metrics['is_std'] = float(is_std_val)
+
+                if logger:
+                    logger.info(
+                        f"Epoch [{epoch}] IS: {is_mean_val:.4f} ± {is_std_val:.4f}"
+                    )
+
+            except Exception as e:
+                if logger:
+                    logger.warning(f"IS 计算失败: {e}")
+                metrics['is_mean'] = None
+                metrics['is_std'] = None
+
+        eval_time = time.time() - eval_start_time
+        if logger:
+            logger.info(f"评估完成，耗时 {eval_time:.2f}s")
+
+        return metrics
+
     def train_full(
         self,
         epochs: Optional[int] = None,
@@ -1218,10 +1350,11 @@ class GMSTrainer:
         validation_freq: int = 1,
         early_stopping_patience: Optional[int] = None,
         callbacks: Optional[List[Callable]] = None,
+        real_images_for_eval: Optional[torch.Tensor] = None,
     ) -> TrainingHistory:
         """完整训练流程
 
-        执行完整的训练和验证循环。
+        执行完整的训练和验证循环，支持 FID/IS 指标评估。
 
         Args:
             epochs: 训练轮数（覆盖配置中的值）
@@ -1229,6 +1362,7 @@ class GMSTrainer:
             validation_freq: 验证频率（每 N 个 epoch）
             early_stopping_patience: 早停耐心值（None 表示不使用）
             callbacks: 回调函数列表
+            real_images_for_eval: 用于计算 FID/IS 的真实图像张量 (N, C, H, W)
 
         Returns:
             TrainingHistory 训练历史
@@ -1237,7 +1371,8 @@ class GMSTrainer:
             >>> history = trainer.train_full(
             ...     epochs=100,
             ...     dataloaders={'train': train_loader, 'val': val_loader},
-            ...     validation_freq=5
+            ...     validation_freq=5,
+            ...     real_images_for_eval=real_images
             ... )
         """
         if epochs is None:
@@ -1277,6 +1412,33 @@ class GMSTrainer:
 
             if should_validate:
                 val_metrics = self.validate(val_loader, epoch)
+
+                should_eval_metrics = (
+                    real_images_for_eval is not None and
+                    epoch % self.config.eval_frequency == 0 and
+                    (self.config.compute_fid or self.config.compute_is)
+                )
+
+                if should_eval_metrics:
+                    eval_results = self.evaluate_with_metrics(
+                        real_images_for_eval, epoch
+                    )
+                    val_metrics.fid_score = eval_results.get('fid')
+                    val_metrics.is_mean = eval_results.get('is_mean')
+                    val_metrics.is_std = eval_results.get('is_std')
+
+                    latest_val = self.history.val_metrics[-1] if self.history.val_metrics else None
+                    if latest_val is not None and latest_val.epoch == epoch:
+                        latest_val.fid_score = val_metrics.fid_score
+                        latest_val.is_mean = val_metrics.is_mean
+                        latest_val.is_std = val_metrics.is_std
+
+                    if logger:
+                        fid_str = f", FID={val_metrics.fid_score:.2f}" if val_metrics.fid_score is not None else ""
+                        is_str = f", IS={val_metrics.is_mean:.2f}±{val_metrics.is_std:.2f}" if val_metrics.is_mean is not None else ""
+                        logger.info(
+                            f"Epoch [{epoch}] 评估指标{fid_str}{is_str}"
+                        )
 
                 if early_stopping_patience is not None:
                     if val_metrics.total_loss < best_val_loss - 1e-6:

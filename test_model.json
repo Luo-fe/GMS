@@ -1,0 +1,31 @@
+{
+    "version": "1.0.0",
+    "created_at": "2026-04-07T10:49:52.212332",
+    "parameters": {
+        "weight": 0.6,
+        "mean1": [
+            0.0,
+            0.0
+        ],
+        "mean2": [
+            2.0,
+            2.0
+        ],
+        "variance1": [
+            1.0,
+            1.0
+        ],
+        "variance2": [
+            1.5,
+            1.5
+        ]
+    },
+    "metadata": {
+        "dimensionality": 2,
+        "is_diagonal": true,
+        "weight": 0.6,
+        "weight2": 0.4,
+        "mean1_norm": 0.0,
+        "mean2_norm": 2.8284270763397217
+    }
+}
