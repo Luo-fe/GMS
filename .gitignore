@@ -1,0 +1,185 @@
+# =========================
+# Python
+# =========================
+
+# 字节编译 / 优化 / DLL 文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C 扩展
+*.so
+
+# 分发/打包
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# 安装日志
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 单元测试 / 覆盖率
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# 类型检查存根
+.pyi
+*.pyi
+
+# =========================
+# 虚拟环境
+# =========================
+
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+virtualenv/
+
+# =========================
+# IDE 和编辑器
+# =========================
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains (PyCharm, IntelliJ, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# =========================
+# 操作系统文件
+# =========================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.ini
+Desktop.ini
+
+# Linux
+*~
+
+# =========================
+# 数据和输出
+# =========================
+
+# 数据集（大文件）
+data/raw/*.csv
+data/raw/*.npy
+data/raw/*.npz
+data/raw/*.pt
+!data/raw/.gitkeep
+
+# 模型权重
+models/*.pth
+models/*.pt
+models/*.ckpt
+!models/.gitkeep
+
+# 实验结果和日志
+logs/
+runs/
+experiments/
+outputs/
+results/
+wandb/
+
+# TensorBoard
+events.out.tfevents.*
+
+# =========================
+# 配置文件（敏感信息）
+# =========================
+
+# 本地配置（可能包含密码或密钥）
+config_local.yaml
+local_config.yaml
+.secrets
+.env.local
+.env.production
+
+# =========================
+# 其他
+# =========================
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.swp
+*.log
+
+# 归档文件
+*.zip
+*.tar.gz
+*.rar
+
+# 文档构建
+docs/_build/
+site/

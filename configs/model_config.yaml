@@ -1,0 +1,124 @@
+# =========================
+# GMM 模型配置文件
+# =========================
+
+# 模型架构定义
+model:
+  name: "gaussian_mixture_model"
+  type: "gmm"
+
+  # 基础参数
+  parameters:
+    n_components: 3
+    input_dimension: 3
+    covariance_type: "full"
+
+  # 初始化策略
+  initialization:
+    method: "kmeans++"
+    n_init: 10
+    random_state: 42
+    kmeans_max_iter: 300
+    
+    # 权重初始化
+    weights_init: null  # null 表示均匀分布，或指定列表 [0.3, 0.4, 0.3]
+    
+    # 均值初始化
+    means_init: null  # null 表示随机初始化，或指定形状为 (n_components, dim) 的数组
+    
+    # 协方差初始化
+    covariances_init: null  # null 表示基于数据初始化
+
+# 组件特定配置
+components:
+  # 组件 1
+  - id: 0
+    weight: 0.33
+    mean: null  # 将在训练时自动初始化
+    covariance:
+      structure: "full"
+      regularization: 1e-6
+  
+  # 组件 2
+  - id: 1
+    weight: 0.34
+    mean: null
+    covariance:
+      structure: "full"
+      regularization: 1e-6
+  
+  # 组件 3
+  - id: 2
+    weight: 0.33
+    mean: null
+    covariance:
+      structure: "full"
+      regularization: 1e-6
+
+# EM 算法配置
+em_algorithm:
+  max_iterations: 100
+  convergence_threshold: 1e-6
+  verbose: true
+  log_interval: 10
+  
+  # E-step 配置
+  e_step:
+    compute_log_probabilities: true
+    normalize_responsibilities: true
+    numerical_stability: true
+    min_probability: 1e-300
+  
+  # M-step 配置
+  m_step:
+    covariance_regularization: true
+    reg_covar: 1e-6
+    enforce_positive_definite: true
+
+# 正则化配置
+regularization:
+  l2_penalty: 0.01
+  entropy_penalty: 0.001
+  sparsity_penalty: 0.0
+  component_sparsity: false
+  min_component_weight: 0.05
+
+# 约束条件
+constraints:
+  equal_covariances: false
+  diagonal_covariances: false
+  spherical_covariances: false
+  tie_weights: false
+  fixed_weights: false
+  fixed_means: false
+  fixed_covariances: false
+
+# 变分推断配置（可选）
+variational:
+  enabled: false
+  n_components_range: [2, 10]
+  alpha_prior: 0.1
+  dirichlet_concentration: 1.0
+  max_variational_iterations: 200
+
+# 模型保存和加载
+checkpointing:
+  save_dir: "./checkpoints/models"
+  save_best_model: true
+  save_frequency: 10
+  keep_last_n: 5
+  format: "pt"  # pt 或 pkl
+
+# 模型元数据
+metadata:
+  created_at: null  # 自动填充
+  framework_version: "pytorch-2.0+"
+  training_data_info:
+    dataset_name: null
+    n_samples: null
+    feature_names: null
+  performance_metrics:
+    final_log_likelihood: null
+    bic_score: null
+    aic_score: null
+    n_parameters: null

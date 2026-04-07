@@ -1,0 +1,113 @@
+# =========================
+# GMS 默认配置文件
+# =========================
+
+# 项目基本信息
+project:
+  name: "Gaussian Mixture Solver"
+  version: "0.1.0"
+  description: "高斯混合模型求解器默认配置"
+
+# 数据配置
+data:
+  input_dim: 3
+  data_path: null
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  normalize: true
+  standardize: false
+
+# GMM 模型参数
+gmm:
+  n_components: 3
+  covariance_type: "full"  # 可选: full, tied, diag, spherical
+  max_iterations: 100
+  tolerance: 1e-6
+  init_method: "kmeans"  # 可选: kmeans, random, from_config
+  reg_covar: 1e-6
+  n_init: 5
+
+# 矩估计配置
+moment_estimation:
+  order: 4  # 矩的阶数 (2, 3, 4)
+  method: "empirical"  # 可选: empirical, robust, weighted
+  use_batching: false
+  batch_size: 1024
+
+# 优化器配置
+optimizer:
+  type: "adam"  # 可选: adam, sgd, adamw
+  learning_rate: 0.001
+  beta1: 0.9
+  beta2: 0.999
+  weight_decay: 0.0001
+  scheduler:
+    enabled: true
+    type: "cosine"  # 可选: step, cosine, exponential, plateau
+    warmup_epochs: 5
+
+# 训练配置
+training:
+  epochs: 100
+  batch_size: 64
+  gradient_clip_norm: 1.0
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 1e-7
+  checkpoint_every: 10
+  save_best_only: true
+
+# 采样配置
+sampling:
+  method: "rejection"  # 可选: rejection, mcmc, inverse_transform
+  n_samples: 10000
+  burn_in: 1000
+  thinning: 10
+  random_seed: 42
+
+# 扩散模型集成配置
+diffusion:
+  enabled: false
+  n_steps: 1000
+  noise_schedule: "linear"  # 可选: linear, cosine, sigmoid
+  beta_start: 0.0001
+  beta_end: 0.02
+  guidance_scale: 1.0
+
+# 评估配置
+evaluation:
+  metrics:
+    - "log_likelihood"
+    - "bic"
+    - "aic"
+    - "silhouette"
+    - "nll"
+  visualization:
+    enabled: true
+    save_plots: true
+    plot_format: "png"
+    dpi: 150
+
+# 日志和监控
+logging:
+  level: "INFO"
+  log_dir: "./logs"
+  tensorboard:
+    enabled: true
+  save_checkpoints: true
+  checkpoint_dir: "./checkpoints"
+
+# 设备配置
+device:
+  auto_detect: true
+  device_type: "cuda"  # cuda 或 cpu
+  gpu_ids: [0]
+  num_workers: 4
+  pin_memory: true
+
+# 随机种子（用于可复现性）
+random_seed: 42
+deterministic: true
+benchmark: false
