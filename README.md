@@ -369,4 +369,6 @@ pytest tests/
 
 ## 联系方式
 
-有问题或者建议的话，可以开 GitHub issue，或者联系 [your-email@example.com]。
+有问题或者建议的话，可以：
+- 开 GitHub issue：https://github.com/Luo-fe/GMS/issues
+- 邮件联系：2564118019@qq.com
